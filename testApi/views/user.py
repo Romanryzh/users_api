@@ -37,7 +37,9 @@ async def get_user(request):
     Функция для получения id пользователя по запросу
     """
     try:
+        logger.info('Получен запрос на получение пользователя из базы данных')
         user_id = int(request.match_info['id'])  # Получаем id из пути запроса
+        logger.info(f'Получен id: {user_id}')
         async with request.app['db'].acquire() as connection:
             user = await connection.fetchrow('SELECT * FROM public.users WHERE id = $1', user_id)
         if user:
@@ -75,16 +77,22 @@ async def update_user(request):
     """
     Функция для обновления данных пользователя по его id в базе данных
     """
-    user_id = int(request.match_info['id'])  # Получаем id пользователя
-    data = await request.json()  # Получаем новые данные
-    async with request.app['db'].acquire() as connection:
-        await connection.execute("""
-            UPDATE public.users
-            SET first_name = $1, last_name = $2, phone_number = $3, age = $4
-            WHERE id = $5
-        """, data['first_name'], data['last_name'], data['phone_number'], data['age'], user_id)  # Обновляем данные пользователя
-    return web.Response(text="User updated", status=200)  # Возвращаем подтверждение
-
+    try:
+        logger.info('Получен запрос на обновление данных пользователя по его id в базе данных')
+        user_id = int(request.match_info['id'])  # Получаем id пользователя
+        logger.info(f'Получен id: {user_id}')
+        data = await request.json()  # Получаем новые данные
+        logger.info(f'')
+        async with request.app['db'].acquire() as connection:
+            await connection.execute("""
+                UPDATE public.users
+                SET first_name = $1, last_name = $2, phone_number = $3, age = $4
+                WHERE id = $5
+            """, data['first_name'], data['last_name'], data['phone_number'], data['age'], user_id)  # Обновляем данные пользователя
+        return web.Response(text="User updated", status=200)  # Возвращаем подтверждение
+    except Exception as e:
+        logger.error(e)
+        return web.Response()
 
 async def get_user_count(request):
     """
