@@ -20,5 +20,4 @@ async def init_app():
     app.router.add_get('/users', get_users)
     app.router.add_put('/users/{id}', update_user)
     app.router.add_get('/user_count', get_user_count)
-    app.router.add_get('/users_filtered', get_users_filtered)
     return app

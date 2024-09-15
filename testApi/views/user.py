@@ -1,9 +1,8 @@
 from aiohttp import web
 import pandas
-from io import BytesIO
 import logging
 import json
-
+from openpyxl.worksheet.worksheet import Worksheet
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -16,20 +15,19 @@ async def create_user(request):
     """
     try:
         logger.info("Получен запрос на создание нового пользователя")
-        data = await request.json()  # Получаем данные из тела запроса
+        data = await request.json()
         logger.info(f"Получены данные: {data}")
-        # произвести валидацию данных
-        async with request.app['db'].acquire() as connection:  # Подключаемся к БД  вынести в отдельный модуль
+        async with request.app['db'].acquire() as connection:
             await connection.execute("""
                 INSERT INTO public.users (first_name, last_name, phone_number, age)
                 VALUES ($1, $2, $3, $4)
-                """, data['first_name'], data['last_name'], data['phone_number'], data['age'])  # Выполняем SQL запрос
+                """, data['first_name'], data['last_name'], data['phone_number'], data['age'])
             logger.info(f"Пользователь {data['first_name']} {data['last_name']} успешно записан в базу данных")
-        return web.Response(json.dumps({"success": "Пользователь успешно зарегистрирован"}), status=201)  # Возвращаем ответ Вернуть объект созданного пользователя и его id
+        return web.Response(json.dumps({"success": "Пользователь успешно зарегистрирован"}), status=201)
     except Exception as e:
         logger.error(e)
         return web.Response(
-            body=json.dumps({"error": "Переданы некорректные параметры создания пользователя"}), status=400) # Вернуть поля в которых были ошибки
+            body=json.dumps({"error": e}), status=400)
 
 
 async def get_user(request):
@@ -38,7 +36,7 @@ async def get_user(request):
     """
     try:
         logger.info('Получен запрос на получение пользователя из базы данных')
-        user_id = int(request.match_info['id'])  # Получаем id из пути запроса
+        user_id = int(request.match_info['id'])
         logger.info(f'Получен id: {user_id}')
         async with request.app['db'].acquire() as connection:
             user = await connection.fetchrow('SELECT * FROM public.users WHERE id = $1', user_id)
@@ -46,31 +44,38 @@ async def get_user(request):
             logger.info(f"Найден пользователь под номером {user['id']}: {user['first_name']} {user['last_name']}")
         else:
             logger.warning(f"Пользователь под номером {user['id']} не найден")
-        return web.json_response(dict(user))  # Возвращаем данные в формате JSON
+        return web.json_response(dict(user))
     except Exception as e:
         logger.error(e)
-        return web.Response(body=json.dumps({"error": "Неверный тип вводных данных"}))
+        return web.Response(body=json.dumps({"error": e}))
 
 
 async def get_users(request):
     """
-    Функция для получения списка пользователей, в удобном формате, json or Excel
+    Функция для получения списка пользователей и для фильтрации по столбцу first_name
+    в удобном для пользователя формате, json или excel
     """
-    format = request.query.get('format', 'json')
-    async with request.app['db'].acquire() as connection:
-        users = await connection.fetch('SELECT * FROM public.users')  # Получаем список пользователей
+    logger.info('Получен запрос на получение списка пользователей из базы данных')
+    format_type = request.rel_url.query.get('format', 'json')
+    first_name = request.rel_url.query.get('first_name', None)
+    async with request.app['db'].acquire() as conn:
+        if first_name:
+            # Если параметр first_name передан, то фильтруем по нему
+            users = await conn.fetch('SELECT * FROM public.users WHERE first_name ILIKE $1', f'%{first_name}%')
+        else:
+            # Если параметр first_name отсутствует, возвращаем всех пользователей
+            users = await conn.fetch('SELECT * FROM public.users')
 
-    if format == 'excel':
-        df = pandas.DataFrame(users)  # Преобразуем данные в DataFrame
-        output = BytesIO()
-        df.to_excel(output, index=False)  # Записываем в Excel файл
-        output.seek(0)
-        return web.Response(body=output, headers={
-            'Content-Disposition': 'attachment; filename="users.xlsx"',
-            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        })  # Возвращаем Excel файл
-    else:
-        return web.json_response([dict(user) for user in users])  # Возвращаем данные в формате JSON
+    users_list = [dict(user) for user in users]
+
+    if format_type == 'excel':
+        # Если запрашивается Excel, создаем и возвращаем файл
+        df = pandas.DataFrame(users_list)
+        df.to_excel('users.xlsx', index=False)
+        return web.FileResponse('users.xlsx')
+
+    # По умолчанию возвращаем список пользователей в формате JSON
+    return web.json_response(users_list)
 
 
 async def update_user(request):
@@ -103,14 +108,6 @@ async def get_user_count(request):
     return web.json_response({'count': count})  # Возвращаем ответ
 
 
-async def get_users_filtered(request):
-    """
-    Функция для получения списка пользователей, по параметру для фильтрации
-    """
-    first_name = request.query.get('first_name', '')  # Получаем параметр для фильтрации
-    async with request.app['db'].acquire() as connection:
-        users = await connection.fetch('SELECT * FROM public.users WHERE first_name ILIKE $1', f'%{first_name}%')  # Выполняем SQL запрос с фильтрацией
-    return web.json_response([dict(user) for user in users])  # Возвращаем отфильтрованные данные
 
 
 
