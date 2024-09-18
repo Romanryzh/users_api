@@ -1,4 +1,4 @@
-from testApi.testApi import init_app
+from testapi.testapi import init_app
 from aiohttp.web import run_app
 
 
