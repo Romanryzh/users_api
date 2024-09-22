@@ -39,14 +39,15 @@ async def get_user(request):
         logger.info(f'Получен id: {user_id}')
         async with request.app['db'].acquire() as connection:
             user = await connection.fetchrow('SELECT * FROM public.users WHERE id = $1', user_id)
-        if user:
+        if user is not None:
             logger.info(f"Найден пользователь под номером {user['id']}: {user['first_name']} {user['last_name']}")
+            return web.json_response(dict(user), status=200)
         else:
-            logger.warning(f"Пользователь под номером {user['id']} не найден")
-        return web.json_response(dict(user))
+            logger.warning(f"Пользователь под номером {user_id} не найден")
+            return web.json_response({"warning": "Пользователь не найден"}, status=404)
     except Exception as e:
         logger.error(e)
-        return web.Response(body=json.dumps({"error": e}))
+        return web.Response(body=json.dumps({"error": e}), status=400)
 
 
 async def get_users(request):
@@ -74,10 +75,10 @@ async def get_users(request):
             logger.info(f"Excel файл {file_path} успешно создан и отправлен.")
 
             # Возвращаем файл пользователю
-            return web.FileResponse(file_path)
+            return web.FileResponse(file_path, status=200)
 
         # По умолчанию возвращаем список пользователей в формате JSON
-        return web.json_response(users_list)
+        return web.json_response(users_list, status=200)
 
     except Exception as e:
         logger.error(f"Ошибка при получении списка пользователей: {str(e)}")
@@ -113,7 +114,7 @@ async def get_user_count(request):
     async with request.app['db'].acquire() as connection:
         count = await connection.fetchval('SELECT COUNT(*) FROM public.users')
     logger.info(f"Ответ по количеству пользователей отправлен и составил {count}")
-    return web.json_response({'count': count})
+    return web.json_response({'count': count}, status=200)
 
 
 

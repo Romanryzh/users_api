@@ -11,7 +11,13 @@ sys.path.append(os.path.dirname(os.path.abspath('auth.py')))
 # Создаем пул соединений с базой данных PostgreSQL
 async def init_app():
     # Создаем пул соединений с базой данных
-    pool = await create_pool(host=db_host, port=db_port, user=db_user, password=db_password, database=db_name)
+    pool = await create_pool(
+        host=db_host,
+        port=db_port,
+        user=db_user,
+        password=db_password,
+        database=db_name
+    )
 
     app = web.Application()
     app['db'] = pool
