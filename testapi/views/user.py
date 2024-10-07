@@ -100,7 +100,13 @@ async def update_user(request):
         user_id = int(request.match_info['id'])
         logger.info(f'Получен id: {user_id}')
         data = await request.json()
-        logger.info(f'')
+        checking_fields = ['first_name', 'last_name', 'phone_number', 'age']
+        missibg_fields = [field for field in checking_fields if field not in data]
+        if missibg_fields:
+            return web.Response(
+                body=json.dumps({"errror": f"Отсутствуют обязательные поля: {', '.join(missibg_fields)}"}),
+                content_type='application/json',
+                status=400)
         async with request.app['db'].acquire() as connection:
             await connection.execute("""
                 UPDATE public.users
