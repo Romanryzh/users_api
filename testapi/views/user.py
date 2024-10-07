@@ -15,6 +15,12 @@ async def create_user(request):
     try:
         logger.info("Получен запрос на создание нового пользователя")
         data = await request.json()
+        checking_fields = ['first_name', 'last_name', 'phone_number', 'age']
+        missibg_fields = [field for field in checking_fields if field not in data]
+        if missibg_fields:
+            return web.Response(body=json.dumps({"errror": f"Отсутствуют обязательные поля: {', '.join(missibg_fields)}"}),
+                                content_type='application/json',
+                                status=400)
         logger.info(f"Получены данные: {data}")
         async with request.app['db'].acquire() as connection:
             await connection.execute("""
@@ -22,7 +28,9 @@ async def create_user(request):
                 VALUES ($1, $2, $3, $4)
                 """, data['first_name'], data['last_name'], data['phone_number'], data['age'])
             logger.info(f"Пользователь {data['first_name']} {data['last_name']} успешно записан в базу данных")
-        return web.Response(body=json.dumps({"success": "Пользователь успешно зарегистрирован"}), status=201)
+        return web.Response(body=json.dumps({"success": "Пользователь успешно зарегистрирован"}),
+                            content_type='application/json',
+                            status=201)
     except Exception as e:
         logger.error(e)
         return web.Response(
@@ -99,7 +107,9 @@ async def update_user(request):
                 SET first_name = $1, last_name = $2, phone_number = $3, age = $4
                 WHERE id = $5
             """, data['first_name'], data['last_name'], data['phone_number'], data['age'], user_id)
-        return web.Response(body=json.dumps({"success": "Данные успешно обновлены"}), status=200)
+        return web.Response(body=json.dumps({"success": "Данные успешно обновлены"}),
+                            content_type='application/json',
+                            status=200)
     except Exception as e:
         logger.error(e)
         return web.Response(body=json.dumps({"error": e}), status=400)
