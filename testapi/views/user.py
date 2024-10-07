@@ -1,5 +1,5 @@
 from aiohttp import web
-import pandas as pd
+import openpyxl as opxl
 import logging
 import json
 
@@ -76,9 +76,17 @@ async def get_users(request):
         users_list = [dict(user) for user in users]
 
         if format_type == 'excel':
-            df = pd.DataFrame(users_list)
+            wb = opxl.Workbook()
+            ws = wb.active
+            ws.title = "Users"
+
+            headers = list(users_list[0].keys()) if users_list else ['Нет данных']
+            ws.append(headers)
+
+            for user in users_list:
+                ws.append(list(user.values()))
             file_path = 'users_filtered.xlsx' if first_name else 'users.xlsx'
-            df.to_excel(file_path, index=False)
+            wb.save(file_path)
 
             logger.info(f"Excel файл {file_path} успешно создан и отправлен.")
 
